@@ -26,6 +26,37 @@ typedef enum {
     #define SLEEP(ms) usleep((ms) * 1000)
 #endif
 
+// 跨平台键盘输入检测
+#ifdef _WIN32
+    #include <conio.h>   // _kbhit, _getch
+    static int key_hit(void) { return _kbhit(); }
+    static char get_key(void) { return _getch(); }
+#else
+    #include <termios.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    static int key_hit(void) {
+        struct termios oldt, newt;
+        int ch;
+        int oldf;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+        ch = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
+        if (ch != EOF) {
+            ungetc(ch, stdin);
+            return 1;
+        }
+        return 0;
+    }
+    static char get_key(void) { return getchar(); }
+#endif
+
 // 数据结构
 typedef struct {
     int id;
@@ -48,15 +79,26 @@ typedef struct {
 TaskArr tasks;
 
 // 函数声明
+//初始化数据结构
 void init_data(void);
+//加载数据
 void load_data(void);
+//保存数据
 void save_data(void);
+//释放动态数组内存
 void free_tasks(void);
+//打印标题
 void print_top(const char *p);
+//清除输入缓冲区，防止scanf后残留的换行符干扰后续输入
 void clear_input_buffer(void);
+//动态数组管理
+//扩容：成功返回1，失败返回0
 int expend_space(void);
+//读取当前最大ID，确保新任务ID唯一且递增
 int get_max_id(void);
+// 添加任务
 void add_task(void);
+// 删除任务
 void delete_task(void);
 void list_tasks(int state);
 //倒计时函数
@@ -65,10 +107,10 @@ int focus_bar(int minutes);
 void start_focus();
 //展示已完成任务
 void complete_task();
-//创建目前任务数量的动态指针数组，方便按优先级排序输出
-Task** task_show_arr();
 //显示报告
 void show_today_report();
+//创建目前任务数量的动态指针数组，方便按优先级排序输出
+Task** task_show_arr();
 
 // 主函数
 int main() {
@@ -84,7 +126,7 @@ int main() {
         printf("删除任务请输入 2\n");
         printf("查看全部任务请输入 3\n");
         printf("查看未完成任务请输入 4\n");
-        printf("开始专注请输入 5\n");
+        printf("开始专注请输入 5，按 Q/q 暂停 60 秒\n");
         printf("查看今日报告请输入 6\n");
         printf("保存并退出请输 -1\n");
         printf("等待输入...\n");
@@ -412,27 +454,44 @@ void start_focus(){
     save_data();
 }
 
-int focus_bar(int minutes){
+int focus_bar(int minutes) {
     int total_second = minutes * 60;
     int var_time = total_second;
-    while(var_time >= 0){
+
+    while (var_time >= 0) {
+        // 检测键盘输入，允许用户按 Q/q 暂停 60 秒
+        if (key_hit()) {
+            char ch = get_key();
+            // 检测 Q 或 q（你可以改成 S/s）
+            if (ch == 'Q' || ch == 'q') {
+                printf("\n暂停 60 秒...\n");
+                SLEEP(60000);          // 暂停 60 秒
+                // 清空可能残留的按键缓冲区
+                while (key_hit()) get_key();
+                printf("继续！\n");
+                // 不改变 var_time，倒计时总时长不变
+            }
+        }
+
+        // 显示进度条
         int min = var_time / 60;
         int sec = var_time % 60;
         int schedule = 20;
         int full = (total_second - var_time) * schedule / total_second;
         printf("\r[任务进行中]: %02d:%02d [", min, sec);
-        for(int i = 0; i < schedule; i++){
-            if(i == full){
-                printf("》");
-            }else{
-                printf(i < full ? "=" : " ");
-            }
+        for (int i = 0; i < schedule; i++) {
+            if (i == full) printf("》");
+            else printf(i < full ? "=" : " ");
         }
         printf("]");
         fflush(stdout);
-        SLEEP(1000);
+
+        SLEEP(1000);   // 休眠 1 秒
         var_time--;
     }
+
+    // 原代码返回总秒数（实际上 total_second - var_time 在循环结束后为 total_second+1）
+    // 这里保持原逻辑,+1好像结束会多一秒
     return total_second - var_time;
 }
 
