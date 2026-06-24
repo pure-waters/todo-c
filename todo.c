@@ -162,58 +162,9 @@ int main() {
     return 0;
 }
 
-// 打印标题
-void print_top(const char *p) {
-    printf("<========%s========>\n", p);
-}
-
-// 清除输入缓冲区，防止scanf后残留的换行符干扰后续输入
-void clear_input_buffer(void) {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF);
-}
-
 // 动态数组管理
 void init_data(void) {
     tasks.items = NULL;
-    tasks.count = 0;
-    tasks.capacity = 0;
-}
-
-// 扩容：成功返回1，失败返回0
-int expend_space(void) {
-    int old_cap = tasks.capacity;
-    int new_cap = (old_cap == 0) ? 10 : old_cap * 2;
-    Task *temp = (Task*)realloc(tasks.items, new_cap * sizeof(Task));
-    if (temp == NULL) {
-        printf("内存扩容失败，无法添加新任务！\n");
-        return 0;
-    }
-    // 新分配的内存清零
-    if (new_cap > old_cap) {
-        memset(temp + old_cap, 0, (new_cap - old_cap) * sizeof(Task));
-    }
-    tasks.items = temp;
-    tasks.capacity = new_cap;
-    return 1;
-}
-
-// 读取当前最大ID，确保新任务ID唯一且递增
-int get_max_id(void) {
-    int max = 0;
-    for (int i = 0; i < tasks.count; i++) {
-        if (tasks.items[i].id > max)
-            max = tasks.items[i].id;
-    }
-    return max;
-}
-
-// 释放动态数组内存
-void free_tasks(void) {
-    if (tasks.items) {
-        free(tasks.items);
-        tasks.items = NULL;
-    }
     tasks.count = 0;
     tasks.capacity = 0;
 }
@@ -256,6 +207,26 @@ void load_data(void) {
     tasks.count = count;
     fread(tasks.items, sizeof(Task), tasks.count, fp);
     fclose(fp);
+}
+
+//----------------------------------------------------------------------------------------------------
+
+// 扩容：成功返回1，失败返回0
+int expend_space(void) {
+    int old_cap = tasks.capacity;
+    int new_cap = (old_cap == 0) ? 10 : old_cap * 2;
+    Task *temp = (Task*)realloc(tasks.items, new_cap * sizeof(Task));
+    if (temp == NULL) {
+        printf("内存扩容失败，无法添加新任务！\n");
+        return 0;
+    }
+    // 新分配的内存清零
+    if (new_cap > old_cap) {
+        memset(temp + old_cap, 0, (new_cap - old_cap) * sizeof(Task));
+    }
+    tasks.items = temp;
+    tasks.capacity = new_cap;
+    return 1;
 }
 
 // 任务操作
@@ -454,6 +425,8 @@ void start_focus(){
     save_data();
 }
 
+//----------------------------------------------------------------------------------------------------
+
 int focus_bar(int minutes) {
     int total_second = minutes * 60;
     int var_time = total_second;
@@ -493,6 +466,37 @@ int focus_bar(int minutes) {
     // 原代码返回总秒数（实际上 total_second - var_time 在循环结束后为 total_second+1）
     // 这里保持原逻辑,+1好像结束会多一秒
     return total_second - var_time;
+}
+
+// 读取当前最大ID，确保新任务ID唯一且递增
+int get_max_id(void) {
+    int max = 0;
+    for (int i = 0; i < tasks.count; i++) {
+        if (tasks.items[i].id > max)
+            max = tasks.items[i].id;
+    }
+    return max;
+}
+
+// 释放动态数组内存
+void free_tasks(void) {
+    if (tasks.items) {
+        free(tasks.items);
+        tasks.items = NULL;
+    }
+    tasks.count = 0;
+    tasks.capacity = 0;
+}
+
+// 打印标题
+void print_top(const char *p) {
+    printf("<========%s========>\n", p);
+}
+
+// 清除输入缓冲区，防止scanf后残留的换行符干扰后续输入
+void clear_input_buffer(void) {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
 }
 
 Task** task_show_arr(){
